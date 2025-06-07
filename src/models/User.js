@@ -11,11 +11,11 @@ const userSchema = new mongoose.Schema(
     learningLanguage: { type: String, default: "" },
     location: { type: String, default: "" },
     isOnboarded: { type: Boolean, default: false },
-    friends: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      default: [],
-    },
+    friends: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    default: [],
+    }]
   },
   { timestamps: true }
 );
@@ -32,6 +32,15 @@ userSchema.pre("save", async function (next) {
     next(error);
   }
 });
+
+// ✅ Register a method to compare passwords
+userSchema.methods.comparePassword = async function (candidatePassword) {
+  try {
+    return await bcrypt.compare(candidatePassword, this.password);
+  } catch (error) {
+    throw new Error("Error comparing passwords");
+  }
+};
 
 // ✅ Model must come after schema definition and hooks
 const User = mongoose.model("User", userSchema);

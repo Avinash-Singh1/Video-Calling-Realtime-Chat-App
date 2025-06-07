@@ -1,7 +1,42 @@
+import { upsertStreamUser } from "../lib/stream.js";
 import User from "../models/User.js"; 
 import jwt from "jsonwebtoken";
-export const login=(req,res)=>{
-    res.send("login Route");
+export const login=async(req,res)=>{
+    try{
+        const {email, password} = req.body;
+        if(!email || !password) {
+            return res.status(400).send("Email and password are required");
+        }
+        const user= await User.findOne({ email });
+        if(!user){
+            return res.status(404).send("Invalid email or password");
+        }
+        const isPasswordValid = await user.comparePassword(password);
+        if(!isPasswordValid){
+            return res.status(401).send("Invalid email or password");
+        }
+
+        const token= jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
+
+        res.cookie("jwt", token, {
+            httpOnly: true, // 
+            secure: process.env.NODE_ENV === "production", // Use secure cookies in production
+            maxAge: 24 * 60 * 60 * 1000, // 1 day
+        }); 
+
+        res.status(200).json({
+            message: "Login successful",
+            user: {
+                id: user._id,
+                fullName: user.fullName,
+                email: user.email,
+                profilePic: user.profilePic,
+            },
+            token, // Send the JWT token in the response
+        });
+    }catch{
+        res.status(400).send("Login failed");
+    }
 }
 export const Singup=async(req,res)=>{
     const {email, password, fullName} = req.body;
@@ -34,7 +69,20 @@ export const Singup=async(req,res)=>{
             profilePic: randomAvatar,
         });
 
-        // Todo : Create the user in the stream as well
+        await newUser.save();
+
+        // TODO: Create the user in the stream as well
+        try{
+            await upsertStreamUser({
+            id: newUser._id.toString(),
+            name: newUser.fullName,
+            image: newUser.profilePic || "",
+            });
+            console.log(`Stream user created for ${newUser.fullName}`);
+        }catch (error) {
+            console.error("Error upserting Stream user:", error);
+            return res.status(500).send("Failed to create user in Stream");
+        }
         const token= jwt.sign({ id: newUser._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
 
         res.cookie("token", token, {
@@ -59,8 +107,15 @@ export const Singup=async(req,res)=>{
         console.error("Error during signup:", error);
         res.status(500).send("Internal Server Error");
     }
-    res.send("Singup Route");
-}
+
+} 
 export const logout=(req,res)=>{
-    res.send("logout Route");
+   res.clearCookie("jwt", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production", // Use secure cookies in production
+    });
+    res.status(200).json({ success:true,message: "Logout successful" });
+}
+export const onboard=async(req,res)=>{
+    console.log("Onboarding route hit",req.user);
 }
