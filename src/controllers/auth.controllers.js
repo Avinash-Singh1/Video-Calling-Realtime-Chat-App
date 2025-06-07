@@ -117,5 +117,26 @@ export const logout=(req,res)=>{
     res.status(200).json({ success:true,message: "Logout successful" });
 }
 export const onboard=async(req,res)=>{
-    console.log("Onboarding route hit",req.user);
+    try{
+        const userId =req.user._id;
+        const {fullName,bio,nativeLanguage, learningLanguage, location}= req.body;
+        if(!fullName || !bio || nativeLanguage || !learningLanguage || !location){
+            return res.status(400).json({
+                message:"All fields are required",
+                missingFields:[
+                    !fullName && "fullName",
+                    !bio && "bio",
+                    !nativeLanguage && "nativeLanguage",
+                    !learningLanguage && "learningLanguage",
+                    !location && "location",
+                ],
+            });
+        }
+        await User.findByIdAndUpdate(userId,{
+            ...req.body,
+            isOnboarded:true,
+        })
+    }catch(err){
+
+    }
 }
